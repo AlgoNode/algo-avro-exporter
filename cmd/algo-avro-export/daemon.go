@@ -65,11 +65,11 @@ var daemonCmd = &cobra.Command{
 				cf()
 			}()
 		}
-
 		var bot fetcher.Fetcher
 		if noAlgod {
 			logger.Info("algod block following disabled")
 		} else if algodAddr != "" && algodToken != "" {
+			logger.Info("Connecting to fecher @ %s", algodAddr)
 			bot, err = fetcher.ForNetAndToken(algodAddr, algodToken, logger)
 			maybeFail(err, "fetcher setup, %v", err)
 		} else if algodDataDir != "" {
@@ -105,6 +105,7 @@ var daemonCmd = &cobra.Command{
 
 				imp := importer.NewImporter(db)
 				handler := func(ctx context.Context, block *rpcs.EncodedBlockCert) error {
+					//lost context :'(
 					return handleBlock(block, &imp)
 				}
 				bot.SetBlockHandler(handler)

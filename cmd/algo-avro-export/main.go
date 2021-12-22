@@ -14,7 +14,7 @@ import (
 
 	"github.com/algorand/indexer/config"
 	"github.com/algorand/indexer/idb"
-	"github.com/algorand/indexer/idb/dummy"
+	_ "github.com/algorand/indexer/idb/avro"
 	_ "github.com/algorand/indexer/idb/postgres"
 	"github.com/algorand/indexer/util/metrics"
 	"github.com/algorand/indexer/version"
@@ -86,17 +86,9 @@ var (
 )
 
 func indexerDbFromFlags(opts idb.IndexerDbOptions) (idb.IndexerDb, chan struct{}) {
-	if postgresAddr != "" {
-		db, ch, err := idb.IndexerDbByName("postgres", postgresAddr, opts, logger)
-		maybeFail(err, "could not init db, %v", err)
-		return db, ch
-	}
-	if dummyIndexerDb {
-		return dummy.IndexerDb(), nil
-	}
-	logger.Errorf("no import db set")
-	os.Exit(1)
-	return nil, nil
+	db, ch, err := idb.IndexerDbByName("avro", postgresAddr, opts, logger)
+	maybeFail(err, "could not init db, %v", err)
+	return db, ch
 }
 
 func init() {
