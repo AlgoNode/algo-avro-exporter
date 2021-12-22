@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	packageQueueDepth = 1             // Block incoming packages after buffering this many requests for a single table name	rotateBlocks      = 10_000        // Rotate avro files after this many blocks
+	packageQueueDepth = 10            // Block incoming packages after buffering this many requests for a single table name
 	blockSize         = 100           // Flush to avro file after this many records
 	rotateRecords     = 1_000_000     // Rotate avro file after this many records
 	rotateAge         = 3600          // Rotate avro file once it is older than this many senconds
@@ -32,13 +32,13 @@ type avroPipe struct {
 	workDir    string
 	gsBucket   string
 	blockSize  int
-	rowChan    chan string
+	rowChan    chan []byte
 	errChan    chan error
 	buffer     *avroBuffer
 }
 
 func makeAvroPipe(ctx context.Context, nameBase string, schema string, errChan chan error, gsBucket string) (*avroPipe, error) {
-	rc := make(chan string, packageQueueDepth)
+	rc := make(chan []byte, packageQueueDepth)
 	aPipe := &avroPipe{
 		ctx:        ctx,
 		nameBase:   nameBase,
@@ -116,8 +116,8 @@ func (ab *avroBuffer) Commit(ctx context.Context) {
 	ab.uncommitedRecords = 0
 }
 
-func (ab *avroBuffer) Append(ctx context.Context, jsonRec string) (bool, error) {
-	native, _, err := ab.pipe.codec.NativeFromTextual([]byte(jsonRec))
+func (ab *avroBuffer) Append(ctx context.Context, jsonRec []byte) (bool, error) {
+	native, _, err := ab.pipe.codec.NativeFromTextual(jsonRec)
 	if err != nil {
 		return false, err
 	}

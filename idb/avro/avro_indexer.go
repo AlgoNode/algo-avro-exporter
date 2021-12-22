@@ -8,8 +8,12 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/algorand/go-algorand/crypto"
 	"github.com/algorand/go-algorand/data/bookkeeping"
+
 	"github.com/algorand/go-algorand/data/transactions"
+	"github.com/algorand/go-codec/codec"
+
 	log "github.com/sirupsen/logrus"
 
 	models "github.com/algorand/indexer/api/generated/v2"
@@ -37,7 +41,6 @@ func IndexerDb(connection string, opts idb.IndexerDbOptions, log *log.Logger) (*
 	//TODO common cancel context
 	ctx, cf := context.WithCancel(context.Background())
 	idb.cancel = cf
-	defer cf()
 
 	{
 		cancelCh := make(chan os.Signal, 1)
@@ -85,8 +88,9 @@ func IndexerDb(connection string, opts idb.IndexerDbOptions, log *log.Logger) (*
 	} else {
 		idb.avroPipes.blocks = ap
 	}
-
-	return idb, nil, nil
+	ch := make(chan struct{})
+	close(ch)
+	return idb, ch, nil
 }
 
 func (db *avroIndexerDb) Close() {
@@ -94,8 +98,48 @@ func (db *avroIndexerDb) Close() {
 	db.cancel()
 }
 
+func encodeJSON(obj interface{}) []byte {
+	var buf []byte
+	enc := codec.NewEncoderBytes(&buf, jsonCodecHandle)
+	enc.MustEncode(obj)
+	return buf
+}
+
+var jsonCodecHandle *codec.JsonHandle
+
+func init() {
+	jsonCodecHandle = new(codec.JsonHandle)
+	jsonCodecHandle.ErrorIfNoField = true
+	jsonCodecHandle.ErrorIfNoArrayExpand = true
+	jsonCodecHandle.Canonical = true
+	jsonCodecHandle.RecursiveEmptyCheck = true
+	jsonCodecHandle.HTMLCharsAsIs = true
+	jsonCodecHandle.Indent = 0
+	jsonCodecHandle.MapKeyAsString = true
+}
+
+type blockHeader struct {
+	bookkeeping.BlockHeader
+	TimeStamp           int64         `codec:"timestamp"`
+	BranchOverride      crypto.Digest `codec:"prev"`
+	FeeSinkOverride     crypto.Digest `codec:"fees"`
+	RewardsPoolOverride crypto.Digest `codec:"rwd"`
+}
+
+func convertBlockHeader(header bookkeeping.BlockHeader) blockHeader {
+	return blockHeader{
+		TimeStamp:           header.TimeStamp * 1000,
+		BlockHeader:         header,
+		BranchOverride:      crypto.Digest(header.Branch),
+		FeeSinkOverride:     crypto.Digest(header.FeeSink),
+		RewardsPoolOverride: crypto.Digest(header.RewardsPool),
+	}
+}
+
 func (db *avroIndexerDb) AddBlock(block *bookkeeping.Block) error {
-	db.log.Printf("AddBlock %v", block.BlockHeader.Round)
+	record := interface{}(convertBlockHeader(block.BlockHeader))
+	log.Infof("%v", record)
+	db.avroPipes.blocks.rowChan <- record
 	return nil
 }
 
@@ -107,13 +151,11 @@ func (db *avroIndexerDb) LoadGenesis(genesis bookkeeping.Genesis) (err error) {
 
 // GetNextRoundToAccount is part of idb.IndexerDB
 func (db *avroIndexerDb) GetNextRoundToAccount() (uint64, error) {
-	db.log.Info("GNR")
 	return 0, nil
 }
 
 // GetNextRoundToLoad is part of idb.IndexerDB
 func (db *avroIndexerDb) GetNextRoundToLoad() (uint64, error) {
-	db.log.Info("GNRtL")
 	return 0, nil
 }
 
