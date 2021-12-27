@@ -7,16 +7,20 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
-	"github.com/algorand/go-algorand/crypto"
+	"github.com/algorand/go-algorand/data/basics"
 	"github.com/algorand/go-algorand/data/bookkeeping"
+	"github.com/linkedin/goavro/v2"
 
 	"github.com/algorand/go-algorand/data/transactions"
 	"github.com/algorand/go-codec/codec"
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/algorand/go-algorand/protocol"
 	models "github.com/algorand/indexer/api/generated/v2"
+
 	"github.com/algorand/indexer/idb"
 	"github.com/algorand/indexer/idb/avro/avsc"
 )
@@ -35,7 +39,7 @@ type avroIndexerDb struct {
 func IndexerDb(connection string, opts idb.IndexerDbOptions, log *log.Logger) (*avroIndexerDb, chan struct{}, error) {
 	idb := &avroIndexerDb{
 		log:        log,
-		gsBucket:   "algo-export/stage",
+		gsBucket:   "algo-export",
 		gProjectId: "algorand-urtho",
 	}
 	//TODO common cancel context
@@ -88,6 +92,13 @@ func IndexerDb(connection string, opts idb.IndexerDbOptions, log *log.Logger) (*
 	} else {
 		idb.avroPipes.blocks = ap
 	}
+
+	if ap, err := makeAvroPipe(ctx, "txns", avsc.SchemaTXNs, errChan, idb.gsBucket); err != nil {
+		return nil, nil, err
+	} else {
+		idb.avroPipes.txns = ap
+	}
+
 	ch := make(chan struct{})
 	close(ch)
 	return idb, ch, nil
@@ -119,27 +130,92 @@ func init() {
 }
 
 type blockHeader struct {
+	_struct struct{} `codec:",omitempty,omitemptyarray"`
 	bookkeeping.BlockHeader
-	TimeStamp           int64         `codec:"timestamp"`
-	BranchOverride      crypto.Digest `codec:"prev"`
-	FeeSinkOverride     crypto.Digest `codec:"fees"`
-	RewardsPoolOverride crypto.Digest `codec:"rwd"`
+	TimeStamp           int64  `codec:"timestamp"`
+	BranchOverride      string `codec:"prev"`
+	FeeSinkOverride     string `codec:"fees"`
+	RewardsPoolOverride string `codec:"rwd"`
 }
 
 func convertBlockHeader(header bookkeeping.BlockHeader) blockHeader {
 	return blockHeader{
-		TimeStamp:           header.TimeStamp * 1000,
+		TimeStamp:           header.TimeStamp * 1_000_000,
 		BlockHeader:         header,
-		BranchOverride:      crypto.Digest(header.Branch),
-		FeeSinkOverride:     crypto.Digest(header.FeeSink),
-		RewardsPoolOverride: crypto.Digest(header.RewardsPool),
+		BranchOverride:      bookkeeping.BlockHash(header.Branch).String(),
+		FeeSinkOverride:     basics.Address(header.FeeSink).String(),
+		RewardsPoolOverride: basics.Address(header.RewardsPool).String(),
 	}
 }
 
+func avroNullLong(i int64) interface{} {
+	if i == 0 {
+		return nil
+	}
+	return goavro.Union("long", i)
+}
+
+func avroNullULong(i uint64) interface{} {
+	if i == 0 {
+		return nil
+	}
+	return goavro.Union("long", int64(i))
+}
+
+func avroNullStr(s string) interface{} {
+	if len(s) == 0 {
+		return nil
+	}
+	return goavro.Union("string", s)
+}
+
+func avroNullBytes(b []byte) interface{} {
+	if b == nil || len(b) == 0 {
+		return nil
+	}
+	return goavro.Union("bytes", b)
+}
+
+func encodePayTx(sTxn *transactions.SignedTxnInBlock, bHeader *blockHeader) interface{} {
+	tx := sTxn.Txn
+	txid := tx.ID()
+	dat := map[string]interface{}{}
+	dat["timestamp"] = time.Unix(bHeader.BlockHeader.TimeStamp, 0)
+	dat["rnd"] = avroNullULong(uint64(bHeader.Round))
+	dat["id"] = avroNullBytes(txid[:])
+	dat["sig"] = avroNullBytes(sTxn.Sig[:])
+
+	dat["amt"] = avroNullULong(tx.Amount.Raw)
+	dat["fee"] = avroNullULong(tx.Fee.Raw)
+	dat["fv"] = avroNullULong(uint64(tx.FirstValid))
+	dat["lv"] = avroNullULong(uint64(tx.LastValid))
+
+	if tx.Note != nil {
+		dat["note"] = avroNullBytes(tx.Note)
+	}
+	dat["snd"] = avroNullStr(tx.Sender.GetUserAddress())
+	dat["rcv"] = avroNullStr(tx.Receiver.GetUserAddress())
+	dat["type"] = avroNullStr(string(tx.Type))
+
+	return dat
+}
+
 func (db *avroIndexerDb) AddBlock(block *bookkeeping.Block) error {
-	record := interface{}(convertBlockHeader(block.BlockHeader))
-	log.Infof("%v", record)
-	db.avroPipes.blocks.rowChan <- record
+	bHeader := convertBlockHeader(block.BlockHeader)
+	db.avroPipes.blocks.rowChan <- &rowStruct{json: encodeJSON(bHeader)}
+
+	for _, sTxn := range block.Payset {
+		var native interface{}
+		switch sTxn.Txn.Type {
+		case protocol.PaymentTx:
+			native = encodePayTx(&sTxn, &bHeader)
+		default:
+			//			log.Infof("Ignoring TX of type %s", sTxn.Txn.Type)
+			continue
+		}
+		db.avroPipes.txns.rowChan <- &rowStruct{native: native}
+
+	}
 	return nil
 }
 
@@ -151,7 +227,7 @@ func (db *avroIndexerDb) LoadGenesis(genesis bookkeeping.Genesis) (err error) {
 
 // GetNextRoundToAccount is part of idb.IndexerDB
 func (db *avroIndexerDb) GetNextRoundToAccount() (uint64, error) {
-	return 0, nil
+	return 13400000, nil
 }
 
 // GetNextRoundToLoad is part of idb.IndexerDB

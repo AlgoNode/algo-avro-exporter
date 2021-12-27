@@ -7,126 +7,110 @@ const SchemaBlocks = `
   "fields": [
     {
       "name": "timestamp",
-      "type": [
-        "null",
-        {
-          "type": "long",
-          "logicaltype": "timestamp-millis"
-        }
-      ],
-      "default": null
+      "type": "long",
+      "logicaltype": "timestamp-micros"
     },
     {
       "name": "earn",
-      "type": [
-        "null",
-        "long"
-      ],
-      "default": null
+      "type": "long",
+      "default": 0
     },
     {
       "name": "fees",
-      "type": [
-        "null",
-        "string"
-      ],
-      "default": null
+      "type": "string"
     },
     {
       "name": "frac",
-      "type": [
-        "null",
-        "long"
-      ],
-      "default": null
+      "type": "long",
+      "default": 0
     },
     {
       "name": "gen",
-      "type": [
-        "null",
-        "string"
-      ],
-      "default": null
+      "type": "string"
     },
     {
       "name": "gh",
-      "type": [
-        "null",
-        "string"
-      ],
-      "default": null
+      "type": "string"
     },
     {
       "name": "prev",
-      "type": [
-        "null",
-        "string"
-      ],
-      "default": null
+      "type": "string",
+      "default": ""
     },
     {
       "name": "proto",
-      "type": [
-        "null",
-        "string"
-      ],
-      "default": null
+      "type": "string"
     },
     {
       "name": "rate",
-      "type": [
-        "null",
-        "long"
-      ],
-      "default": null
+      "type": "long"
     },
     {
       "name": "rnd",
-      "type": [
-        "null",
-        "long"
-      ],
-      "default": null
+      "type": "long",
+      "default": 0
     },
     {
       "name": "rwcalr",
-      "type": [
-        "null",
-        "long"
-      ],
-      "default": null
+      "type": "long"
     },
     {
       "name": "rwd",
-      "type": [
-        "null",
-        "string"
-      ],
+      "type": ["null","string"],
       "default": null
     },
     {
       "name": "seed",
-      "type": [
-        "null",
-        "string"
-      ],
-      "default": null
+      "type": "string"
     },
     {
       "name": "tc",
-      "type": [
-        "null",
-        "long"
-      ],
-      "default": null
+      "type": ["null","long"],
+      "default": null      
     },
     {
       "name": "ts",
-      "type": [
-        "null",
-        "long"
-      ],
+      "type": "long"
+    },
+    {
+      "name": "txn",
+      "type": ["null","string"],
       "default": null
+    },
+    { 
+      "name": "nextbefore",
+      "type": ["null","long"],
+      "default": null      
+    },
+    { 
+      "name": "nextswitch",
+      "type": ["null","long"],
+      "default": null      
+    },
+    { 
+      "name": "nextproto",
+      "type": ["null","string"],
+      "default": null      
+    },
+    { 
+      "name": "nextyes",
+      "type": ["null","long"],
+      "default": null      
+    },
+    { 
+      "name": "upgradeyes",
+      "type": ["null","boolean"],
+      "default": null      
+    },
+    { 
+      "name": "upgradedelay",
+      "type": ["null","long"],
+      "default": null      
+    },
+    { 
+      "name": "upgradeprop",
+      "type": ["null","string"],
+      "default": null      
     }
   ]
 }`

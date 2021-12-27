@@ -7,21 +7,27 @@ import (
 	"path/filepath"
 	"time"
 
-	avsc "github.com/algorand/indexer/idb/avro/avsc"
+	//	"github.com/ouzi-dev/avro-kedavro/pkg/kedavro"
+
 	"github.com/linkedin/goavro/v2"
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	packageQueueDepth = 10            // Block incoming packages after buffering this many requests for a single table name
-	blockSize         = 100           // Flush to avro file after this many records
-	rotateRecords     = 1_000_000     // Rotate avro file after this many records
+	packageQueueDepth = 60            // Block incoming packages after buffering this many requests for a single table name
+	blockSize         = 1_000         // Flush to avro file after this many records
+	rotateRecords     = 100_000       // Rotate avro file after this many records
 	rotateAge         = 3600          // Rotate avro file once it is older than this many senconds
 	avroWorkFolder    = "output"      // Avro working dir
 	avroTmpFolder     = "tmp"         // Avro temp folder with .avro.tmp files - cleared on service start
 	avroStageFolder   = "stage"       // Avro staging dir - closed files , queued for upload end up here
 	avroErroredFolder = "stage/error" // Staged avro files that have issues with immediate upload end up here (retries are made every minute)
 )
+
+type rowStruct struct {
+	json   []byte
+	native interface{}
+}
 
 type avroPipe struct {
 	ctx        context.Context
@@ -32,13 +38,14 @@ type avroPipe struct {
 	workDir    string
 	gsBucket   string
 	blockSize  int
-	rowChan    chan []byte
+	rowChan    chan *rowStruct
 	errChan    chan error
 	buffer     *avroBuffer
+	//	kparser    kedavro.Parser
 }
 
 func makeAvroPipe(ctx context.Context, nameBase string, schema string, errChan chan error, gsBucket string) (*avroPipe, error) {
-	rc := make(chan []byte, packageQueueDepth)
+	rc := make(chan *rowStruct, packageQueueDepth)
 	aPipe := &avroPipe{
 		ctx:        ctx,
 		nameBase:   nameBase,
@@ -50,8 +57,14 @@ func makeAvroPipe(ctx context.Context, nameBase string, schema string, errChan c
 		gsBucket:   gsBucket,
 		blockSize:  blockSize,
 	}
-	if codec, err := goavro.NewCodec(avsc.SchemaBlocks); err != nil {
-		return nil, fmt.Errorf("parsing AVSC schema for %s : %v", nameBase, err)
+	// if p, err := kedavro.NewParser(schema, kedavro.WithTimestampToMicros()); err != nil {
+	// 	return nil, fmt.Errorf("parsing AVSC/Kedavro schema for %s : %v", nameBase, err)
+	// } else {
+	// 	aPipe.kparser = p
+	// }
+
+	if codec, err := goavro.NewCodec(schema); err != nil {
+		return nil, fmt.Errorf("parsing AVSC/GoAvro schema for %s : %v", nameBase, err)
 	} else {
 		aPipe.codec = codec
 	}
@@ -70,11 +83,11 @@ Forever:
 		select {
 		case <-pipe.ctx.Done():
 			break Forever
-		case jsonRec, ok := <-pipe.rowChan:
+		case rowRec, ok := <-pipe.rowChan:
 			if !ok {
 				break Forever
 			}
-			rotate, err := pipe.buffer.Append(pipe.ctx, jsonRec)
+			rotate, err := pipe.buffer.Append(pipe.ctx, rowRec)
 			if err != nil {
 				pipe.errChan <- err
 				break Forever
@@ -116,11 +129,19 @@ func (ab *avroBuffer) Commit(ctx context.Context) {
 	ab.uncommitedRecords = 0
 }
 
-func (ab *avroBuffer) Append(ctx context.Context, jsonRec []byte) (bool, error) {
-	native, _, err := ab.pipe.codec.NativeFromTextual(jsonRec)
-	if err != nil {
-		return false, err
+func (ab *avroBuffer) Append(ctx context.Context, rowRec *rowStruct) (bool, error) {
+	var native interface{}
+	if rowRec.json != nil {
+		// if n, err := ab.pipe.kparser.Parse(rowRec.json); err != nil {
+		// 	log.Error(string(rowRec.json))
+		// 	return false, err
+		// } else {
+		// 	native = n
+		// }
+	} else {
+		native = rowRec.native
 	}
+
 	if ab.records == nil {
 		ab.records = make([]interface{}, 0, ab.flushRecordsAt)
 	}

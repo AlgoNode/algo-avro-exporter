@@ -6,6 +6,7 @@ replace github.com/algorand/go-algorand => ./third_party/go-algorand
 
 require (
 	cloud.google.com/go/storage v1.10.0
+	github.com/actgardner/gogen-avro/v10 v10.1.0 // indirect
 	github.com/algorand/go-algorand v0.0.0-20210803210013-358a2e1609c9
 	github.com/algorand/go-algorand-sdk v1.9.1
 	github.com/algorand/go-codec/codec v1.1.7
@@ -20,6 +21,7 @@ require (
 	github.com/labstack/echo/v4 v4.3.0
 	github.com/linkedin/goavro/v2 v2.10.1
 	github.com/orlangure/gnomock v0.12.0
+	github.com/ouzi-dev/avro-kedavro v0.5.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.10.0
 	github.com/sirupsen/logrus v1.6.0
