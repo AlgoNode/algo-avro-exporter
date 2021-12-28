@@ -194,31 +194,27 @@ const SchemaTXNs = `
       },
       {
         "name": "apaa",
-        "type": {
-          "type": "array",
-          "items": "bytes"
-        }
+        "type": 
+          ["null", {"type": "array","items": "bytes"}]
+        , "default" : null
       },
       {
         "name": "apat",
-        "type": {
-          "type": "array",
-          "items": "string"
-        }
+        "type": 
+          ["null", {"type": "array","items": "string"}]
+        , "default" : null
       },
       {
         "name": "apfa",
-        "type": {
-          "type": "array",
-          "items": "long"
-        }
+        "type": 
+          ["null", { "type": "array",  "items": "long"}]
+        , "default": null
       },
       {
         "name": "apas",
-        "type": {
-          "type": "array",
-          "items": "long"
-        }
+        "type": 
+          ["null", { "type": "array",  "items": "long"}]
+        , "default": null
       },
       {
         "name": "apls",

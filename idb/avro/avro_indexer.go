@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/algorand/go-algorand/crypto"
 	"github.com/algorand/go-algorand/data/basics"
 	"github.com/algorand/go-algorand/data/bookkeeping"
 	"github.com/linkedin/goavro/v2"
@@ -132,7 +133,6 @@ func init() {
 type blockHeader struct {
 	_struct struct{} `codec:",omitempty,omitemptyarray"`
 	bookkeeping.BlockHeader
-	TimeStamp           int64  `codec:"timestamp"`
 	BranchOverride      string `codec:"prev"`
 	FeeSinkOverride     string `codec:"fees"`
 	RewardsPoolOverride string `codec:"rwd"`
@@ -140,7 +140,6 @@ type blockHeader struct {
 
 func convertBlockHeader(header bookkeeping.BlockHeader) blockHeader {
 	return blockHeader{
-		TimeStamp:           header.TimeStamp * 1_000_000,
 		BlockHeader:         header,
 		BranchOverride:      bookkeeping.BlockHash(header.Branch).String(),
 		FeeSinkOverride:     basics.Address(header.FeeSink).String(),
@@ -162,6 +161,10 @@ func avroNullULong(i uint64) interface{} {
 	return goavro.Union("long", int64(i))
 }
 
+func avroNullULong0(i uint64) interface{} {
+	return goavro.Union("long", int64(i))
+}
+
 func avroNullStr(s string) interface{} {
 	if len(s) == 0 {
 		return nil
@@ -176,17 +179,43 @@ func avroNullBytes(b []byte) interface{} {
 	return goavro.Union("bytes", b)
 }
 
-func encodePayTx(sTxn *transactions.SignedTxnInBlock, bHeader *blockHeader) interface{} {
-	tx := sTxn.Txn
-	txid := tx.ID()
+func encodeBlock(b *blockHeader) map[string]interface{} {
 	dat := map[string]interface{}{}
-	dat["timestamp"] = time.Unix(bHeader.BlockHeader.TimeStamp, 0)
-	dat["rnd"] = avroNullULong(uint64(bHeader.Round))
-	dat["id"] = avroNullBytes(txid[:])
-	dat["sig"] = avroNullBytes(sTxn.Sig[:])
 
-	dat["amt"] = avroNullULong(tx.Amount.Raw)
-	dat["fee"] = avroNullULong(tx.Fee.Raw)
+	dat["timestamp"] = time.Unix(b.BlockHeader.TimeStamp, 0)
+	dat["earn"] = avroNullULong(b.RewardsLevel)
+	dat["fees"] = avroNullStr(b.FeeSinkOverride)
+	dat["frac"] = avroNullULong(b.RewardsResidue)
+	dat["gen"] = avroNullStr(b.GenesisID)
+	dat["gh"] = avroNullStr(b.GenesisHash.String())
+	dat["prev"] = avroNullStr(b.BranchOverride)
+	dat["proto"] = avroNullStr(string(b.UpgradeState.CurrentProtocol))
+	dat["rate"] = avroNullULong(b.RewardsRate)
+	dat["rnd"] = avroNullULong0(uint64(b.Round))
+	dat["rwcalr"] = avroNullULong(uint64(b.RewardsRecalculationRound))
+	dat["rwd"] = avroNullStr(b.RewardsPoolOverride)
+	dat["seed"] = avroNullStr(crypto.Digest(b.Seed).String())
+	dat["tc"] = avroNullULong0(b.TxnCounter)
+	dat["ts"] = avroNullULong(uint64(b.TimeStamp))
+	dat["txn"] = avroNullStr(b.TxnRoot.String())
+	dat["nextbefore"] = avroNullULong(uint64(b.NextProtocolVoteBefore))
+	dat["nextswitch"] = avroNullULong(uint64(b.NextProtocolSwitchOn))
+	dat["nextproto"] = avroNullStr(string(b.NextProtocol))
+	dat["nextyes"] = avroNullULong(b.NextProtocolApprovals)
+	if len(b.UpgradePropose) > 0 {
+		dat["upgradeprop"] = avroNullStr(string(b.UpgradePropose))
+		dat["upgradeyes"] = goavro.Union("boolean", b.UpgradeApprove)
+		dat["upgradedelay"] = avroNullULong0(b.NextProtocolApprovals)
+	}
+	return dat
+}
+
+func encodePayTx(sTxn *transactions.SignedTxnInBlock) map[string]interface{} {
+	tx := sTxn.Txn
+	dat := map[string]interface{}{}
+
+	dat["amt"] = avroNullULong0(tx.Amount.Raw)
+	dat["fee"] = avroNullULong0(tx.Fee.Raw)
 	dat["fv"] = avroNullULong(uint64(tx.FirstValid))
 	dat["lv"] = avroNullULong(uint64(tx.LastValid))
 
@@ -202,18 +231,25 @@ func encodePayTx(sTxn *transactions.SignedTxnInBlock, bHeader *blockHeader) inte
 
 func (db *avroIndexerDb) AddBlock(block *bookkeeping.Block) error {
 	bHeader := convertBlockHeader(block.BlockHeader)
-	db.avroPipes.blocks.rowChan <- &rowStruct{json: encodeJSON(bHeader)}
+	db.avroPipes.blocks.rowChan <- &rowStruct{native: encodeBlock(&bHeader)}
 
 	for _, sTxn := range block.Payset {
-		var native interface{}
+		var dat map[string]interface{}
+		txid := sTxn.Txn.ID()
+
 		switch sTxn.Txn.Type {
 		case protocol.PaymentTx:
-			native = encodePayTx(&sTxn, &bHeader)
+			dat = encodePayTx(&sTxn)
 		default:
 			//			log.Infof("Ignoring TX of type %s", sTxn.Txn.Type)
 			continue
 		}
-		db.avroPipes.txns.rowChan <- &rowStruct{native: native}
+		dat["timestamp"] = time.Unix(bHeader.BlockHeader.TimeStamp, 0)
+		dat["rnd"] = avroNullULong(uint64(bHeader.Round))
+		dat["id"] = avroNullBytes(txid[:])
+		dat["sig"] = avroNullBytes(sTxn.Sig[:])
+
+		db.avroPipes.txns.rowChan <- &rowStruct{native: dat}
 
 	}
 	return nil
