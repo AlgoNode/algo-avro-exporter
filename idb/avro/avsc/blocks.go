@@ -8,51 +8,57 @@ const SchemaBlocks = `
     {
       "name": "timestamp",
       "type": "long",
-      "logicaltype": "timestamp-micros"
+      "logicalType": "timestamp-micros"
     },
     {
       "name": "earn",
-      "type": "long",
-      "default": 0
+      "type": ["null", "long"],
+      "default": null
     },
     {
       "name": "fees",
-      "type": "string"
+      "type": ["null", "string"],
+      "default": null
     },
     {
       "name": "frac",
-      "type": "long",
-      "default": 0
+      "type": ["null", "long"],
+      "default": null
     },
     {
       "name": "gen",
-      "type": "string"
+      "type": ["null", "string"],
+      "default": null
     },
     {
       "name": "gh",
-      "type": "string"
+      "type": ["null", "string"],
+      "default": null
     },
     {
       "name": "prev",
-      "type": "string",
-      "default": ""
+      "type": ["null", "string"],
+      "default": null
     },
     {
       "name": "proto",
-      "type": "string"
+      "type": ["null", "string"],
+      "default": null
     },
     {
       "name": "rate",
-      "type": "long"
+      "type": ["null", "long"],
+      "default": null
     },
     {
       "name": "rnd",
-      "type": "long",
-      "default": 0
+      "type": ["null", "long"],
+      "default": null
     },
     {
       "name": "rwcalr",
-      "type": "long"
+      "type": ["null", "long"],
+      "default": null
     },
     {
       "name": "rwd",
@@ -61,7 +67,8 @@ const SchemaBlocks = `
     },
     {
       "name": "seed",
-      "type": "string"
+      "type": ["null", "string"],
+      "default": null
     },
     {
       "name": "tc",
@@ -70,7 +77,8 @@ const SchemaBlocks = `
     },
     {
       "name": "ts",
-      "type": "long"
+      "type": ["null", "long"],
+      "default": null
     },
     {
       "name": "txn",

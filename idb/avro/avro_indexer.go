@@ -86,6 +86,7 @@ func IndexerDb(connection string, opts idb.IndexerDbOptions, log *log.Logger) (*
 		}
 	} else {
 		log.Warnf("Google Storage upload disabled!")
+		idb.gsBucket = ""
 	}
 
 	if ap, err := makeAvroPipe(ctx, "blocks", avsc.SchemaBlocks, errChan, idb.gsBucket); err != nil {
@@ -263,7 +264,7 @@ func (db *avroIndexerDb) LoadGenesis(genesis bookkeeping.Genesis) (err error) {
 
 // GetNextRoundToAccount is part of idb.IndexerDB
 func (db *avroIndexerDb) GetNextRoundToAccount() (uint64, error) {
-	return 13400000, nil
+	return 0, nil
 }
 
 // GetNextRoundToLoad is part of idb.IndexerDB

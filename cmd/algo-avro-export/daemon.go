@@ -192,7 +192,9 @@ func handleBlock(block *rpcs.EncodedBlockCert, imp *importer.Importer) error {
 		metrics.ImportedRoundGauge.Set(float64(block.Block.Round()))
 	}
 
-	logger.Infof("round r=%d (%d txn) imported in %s", block.Block.Round(), len(block.Block.Payset), dt.String())
+	if block.Block.Round()%1000 == 0 {
+		logger.Infof("round r=%d (%d txn) imported", block.Block.Round(), len(block.Block.Payset))
+	}
 
 	return nil
 }
