@@ -29,15 +29,15 @@ const (
 var statements = map[string]string{
 	blockHeaderStmtName: "SELECT header FROM block_header WHERE round = $1",
 	assetCreatorStmtName: "SELECT creator_addr FROM asset " +
-		"WHERE index = $1 AND NOT deleted",
-	appCreatorStmtName: "SELECT creator FROM app WHERE index = $1 AND NOT deleted",
+		"WHERE idx = $1 AND NOT deleted",
+	appCreatorStmtName: "SELECT creator FROM app WHERE idx = $1 AND NOT deleted",
 	accountStmtName: "SELECT microalgos, rewardsbase, rewards_total, account_data " +
 		"FROM account WHERE addr = $1 AND NOT deleted",
 	assetHoldingsStmtName: "SELECT assetid, amount, frozen FROM account_asset " +
 		"WHERE addr = $1 AND NOT deleted",
-	assetParamsStmtName: "SELECT index, params FROM asset " +
+	assetParamsStmtName: "SELECT idx, params FROM asset " +
 		"WHERE creator_addr = $1 AND NOT deleted",
-	appParamsStmtName: "SELECT index, params FROM app WHERE creator = $1 AND NOT deleted",
+	appParamsStmtName: "SELECT idx, params FROM app WHERE creator = $1 AND NOT deleted",
 	appLocalStatesStmtName: "SELECT app, localstate FROM account_app " +
 		"WHERE addr = $1 AND NOT deleted",
 	accountTotalsStmtName: `SELECT v FROM metastate WHERE k = '` +

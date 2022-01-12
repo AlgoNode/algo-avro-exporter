@@ -72,7 +72,7 @@ CREATE INDEX IF NOT EXISTS account_asset_by_addr_partial ON account_asset(addr) 
 
 -- data.basics.AccountData AssetParams[index] AssetParams{}
 CREATE TABLE IF NOT EXISTS asset (
-  "index" bigint PRIMARY KEY,
+  idx bigint PRIMARY KEY,
   creator_addr bytea NOT NULL,
   params jsonb NOT NULL, -- data.basics.AssetParams; json string "null" iff asset is deleted
   deleted bool NOT NULL, -- whether or not it is currently deleted
@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS metastate (
 -- per app global state
 -- roughly go-algorand/data/basics/userBalance.go AppParams
 CREATE TABLE IF NOT EXISTS app (
-  "index" bigint PRIMARY KEY,
+  idx bigint PRIMARY KEY,
   creator bytea NOT NULL, -- account address
   params jsonb NOT NULL, -- json string "null" iff app is deleted
   deleted bool NOT NULL, -- whether or not it is currently deleted

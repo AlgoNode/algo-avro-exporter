@@ -25,6 +25,7 @@ import (
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/log/logrusadapter"
 	"github.com/jackc/pgx/v4/pgxpool"
 	log "github.com/sirupsen/logrus"
 
@@ -45,9 +46,6 @@ import (
 var serializable = pgx.TxOptions{IsoLevel: pgx.Serializable} // be a real ACID database
 var readonlyRepeatableRead = pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly}
 
-// OpenPostgres is available for creating test instances of postgres.IndexerDb
-// Returns an error object and a channel that gets closed when blocking migrations
-// finish running successfully.
 func OpenPostgres(connection string, opts idb.IndexerDbOptions, log *log.Logger) (*IndexerDb, chan struct{}, error) {
 	db, err := pgxpool.Connect(context.Background(), connection)
 
@@ -55,6 +53,28 @@ func OpenPostgres(connection string, opts idb.IndexerDbOptions, log *log.Logger)
 		return nil, nil, fmt.Errorf("connecting to postgres: %v", err)
 	}
 
+	if strings.Contains(connection, "readonly") {
+		opts.ReadOnly = true
+	}
+
+	return openPostgres(db, opts, log)
+}
+
+// OpenPostgres is available for creating test instances of postgres.IndexerDb
+// Returns an error object and a channel that gets closed when blocking migrations
+// finish running successfully.
+func OpenPostgresDebug(connection string, opts idb.IndexerDbOptions, log *log.Logger) (*IndexerDb, chan struct{}, error) {
+	config, err := pgxpool.ParseConfig(connection)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing postgres connection string: %v", err)
+	}
+
+	config.ConnConfig.Logger = logrusadapter.NewLogger(log)
+	db, err := pgxpool.ConnectConfig(context.Background(), config)
+	if err != nil {
+		return nil, nil, fmt.Errorf("connecting to postgres: %v", err)
+	}
 	if strings.Contains(connection, "readonly") {
 		opts.ReadOnly = true
 	}
@@ -1805,18 +1825,18 @@ func (db *IndexerDb) buildAccountQuery(opts idb.AccountQueryOptions) (query stri
 
 // Assets is part of idb.IndexerDB
 func (db *IndexerDb) Assets(ctx context.Context, filter idb.AssetsQuery) (<-chan idb.AssetRow, uint64) {
-	query := `SELECT index, creator_addr, params, created_at, closed_at, deleted FROM asset a`
+	query := `SELECT idx, creator_addr, params, created_at, closed_at, deleted FROM asset a`
 	const maxWhereParts = 14
 	whereParts := make([]string, 0, maxWhereParts)
 	whereArgs := make([]interface{}, 0, maxWhereParts)
 	partNumber := 1
 	if filter.AssetID != 0 {
-		whereParts = append(whereParts, fmt.Sprintf("a.index = $%d", partNumber))
+		whereParts = append(whereParts, fmt.Sprintf("a.idx = $%d", partNumber))
 		whereArgs = append(whereArgs, filter.AssetID)
 		partNumber++
 	}
 	if filter.AssetIDGreaterThan != 0 {
-		whereParts = append(whereParts, fmt.Sprintf("a.index > $%d", partNumber))
+		whereParts = append(whereParts, fmt.Sprintf("a.idx > $%d", partNumber))
 		whereArgs = append(whereArgs, filter.AssetIDGreaterThan)
 		partNumber++
 	}
@@ -2042,19 +2062,19 @@ func (db *IndexerDb) Applications(ctx context.Context, filter *models.SearchForA
 		return out, 0
 	}
 
-	query := `SELECT index, creator, params, created_at, closed_at, deleted FROM app `
+	query := `SELECT idx, creator, params, created_at, closed_at, deleted FROM app `
 
 	const maxWhereParts = 30
 	whereParts := make([]string, 0, maxWhereParts)
 	whereArgs := make([]interface{}, 0, maxWhereParts)
 	partNumber := 1
 	if filter.ApplicationId != nil {
-		whereParts = append(whereParts, fmt.Sprintf("index = $%d", partNumber))
+		whereParts = append(whereParts, fmt.Sprintf("idx = $%d", partNumber))
 		whereArgs = append(whereArgs, *filter.ApplicationId)
 		partNumber++
 	}
 	if filter.Next != nil {
-		whereParts = append(whereParts, fmt.Sprintf("index > $%d", partNumber))
+		whereParts = append(whereParts, fmt.Sprintf("idx > $%d", partNumber))
 		whereArgs = append(whereArgs, *filter.Next)
 		partNumber++
 	}
